@@ -116,11 +116,11 @@ class CarRentalEnvironment:
 # In[3]:
 
 
-def build_model(input_shape, output_size, lr=0.05):
+def build_model(input_shape, output_size, lr=0.001):
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(64, activation='relu', input_shape=input_shape),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dense(256, activation='relu'),
+        tf.keras.layers.Dense(256, activation='relu'),
         tf.keras.layers.Dense(output_size)
     ])
     model.compile(loss="mean_squared_error", optimizer=Adam(learning_rate=lr), metrics=['acc'])
@@ -179,10 +179,10 @@ def exploration_rate(min_rate, max_rate, decay_rate, episode):
 
 # # DQN Training
 
-# In[13]:
+# In[6]:
 
 
-def dqn_train(env, num_episodes=1000, max_steps_per_episode=7, batch_size=64, gamma=0.9, epsilon_min=0.01, epsilon_decay=0.995):
+def dqn_train(env, num_episodes=2000, max_steps_per_episode=7, batch_size=64, gamma=0.95, epsilon_max=1.0, epsilon_min=0.1, epsilon_decay=0.0005):
     replay_buffer = deque(maxlen=2000)
     buffer_batch_start = 1000
     input_shape = (len(env.state_space[0]),)
@@ -200,7 +200,7 @@ def dqn_train(env, num_episodes=1000, max_steps_per_episode=7, batch_size=64, ga
         state = np.reshape(state, (1, -1))
         total_reward = 0
 
-        epsilon = exploration_rate(0.1, 1.0, 0.005, episode)
+        epsilon = exploration_rate(epsilon_min, epsilon_max, epsilon_decay, episode)
 
         for step in range(max_steps_per_episode):
             if np.random.rand() <= epsilon:
@@ -250,21 +250,23 @@ def dqn_train(env, num_episodes=1000, max_steps_per_episode=7, batch_size=64, ga
 
                 online_network.fit(states, target_q_values, epochs=1, verbose=0)
 
-        if (episode + 1) % 100 == 0:
-            current_lr = online_network.optimizer.lr.numpy()
-            new_lr = current_lr * 0.5  # Reduce learning rate by half
-            online_network.optimizer.lr.assign(new_lr)
-            print("Reduced learning rate to:", new_lr)
+#         if (episode + 1) % 100 == 0:
+#             current_lr = online_network.optimizer.lr.numpy()
+#             new_lr = current_lr * 0.5  # Reduce learning rate by half
+#             online_network.optimizer.lr.assign(new_lr)
+#             print("Reduced learning rate to:", new_lr)
+        if episode % 100 == 0:
+            target_network.set_weights(online_network.get_weights())  # Update target network
 
-        if episode % 50 == 0:
+        if (episode + 1) % 50 == 0:
             test_reward = run_episodes_continuous(env, online_network, target_network)
             test_rewards.append(test_reward)
             print("Test Reward after {} episodes: {:.2f}".format(episode + 1, test_reward))
-
+            
     return online_network, test_rewards
 
 
-# In[14]:
+# In[7]:
 
 
 if __name__ == '__main__':
@@ -273,7 +275,7 @@ if __name__ == '__main__':
     print("Final Test Rewards:", test_rewards)
 
 
-# In[18]:
+# In[8]:
 
 
 plt.figure(figsize=(8, 6))
@@ -286,11 +288,11 @@ plt.savefig('testing_reward_plot.png')  # Save the plot as 'testing_reward_plot.
 plt.show()
 
 
-# In[17]:
+# In[9]:
 
 
 plt.figure(figsize=(8, 6))
-plt.plot(range(0, 1000, 50), test_rewards[7:])
+plt.plot(range(0, 2000, 50), test_rewards[7:])
 plt.xlabel('Training Episodes')
 plt.ylabel('Average Test Reward')
 plt.title('Testing Reward Plot')
